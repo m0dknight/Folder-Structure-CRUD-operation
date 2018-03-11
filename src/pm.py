@@ -7,7 +7,7 @@ from projman import createStructure, otherOperations
 
 #default project path and permission for file/folder structure
 proj_path = ""
-perm="0777"
+perm="0751"
 
 #Defining arguments for the CLI
 parser = argparse.ArgumentParser()
