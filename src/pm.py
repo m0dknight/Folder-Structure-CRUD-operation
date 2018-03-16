@@ -3,7 +3,9 @@
 import argparse
 import yaml
 import os
-from projman import createStructure, otherOperations
+import re
+import sys
+from projman import structure, otherOperations
 
 #default project path and permission for file/folder structure
 proj_path = ""
@@ -17,25 +19,59 @@ parser.add_argument("SUBCMD", help="Enter the subcommnad to execute.")
 parser.add_argument("NAME",nargs='?',help="Name of the project to perform subcommnad.")
 args = parser.parse_args()
 
+# def getYaml():
+#     """Gets yaml file"""
+#     if 'PROJMAN_TEMPLATES' in os.environ.keys():
+#         yaml_path = os.environ.get('PROJMAN_TEMPLATES')
+#     else:
+#         yaml_path = 'de.yaml'
+#
+#     with open (yaml_path,'r') as ymlfile:
+#         try:
+#             yd = yaml.load(ymlfile)
+#         except yaml.YAMLError as er:
+#             sys.stderr.write(er)
+#             raise SystemExit(4)
+#     return yd
+
 def getYaml():
     """Gets yaml file"""
-    if 'PROJMAN_TEMPLATES' in os.environ.keys():
-        yaml_path = os.environ.get('PROJMAN_TEMPLATES')
-    else:
-        yaml_path = 'de.yaml'
+    #Creates empty yaml file
+    fn = 'inputDDIsunyl.yaml'
+    with open(os.path.join(os.getcwd(),fn),'w') as yaml_file:
+        pass
+    # yaml_paths = os.environ.get("PROJMAN_TEMPLATES")
+    yaml_paths ='/Users/sunilhn/Documents/python_learning/DDI_Hackathon/src:/Users/sunilhn/Documents/python_learning/skillenza'
+    for path in yaml_paths.split(':'):
+        try:
+            for files in os.listdir(path):
+                if re.search("\.yaml",files) and files != fn:
+                    #Reading the yaml data
+                    with open(os.path.join(path,files),'r') as yaml_file:
+                        yd = yaml_file.read()
+                    #Writing the yaml data to temperorary yaml file created
+                    with open(os.path.join(os.getcwd(),fn),'a') as yaml_file:
+                        yaml_file.write(yd)
+        except FileNotFoundError:
+            pass
 
-    with open (yaml_path,'r') as ymlfile:
+    with open(os.path.join(os.getcwd(),fn),'r') as ymlfile:
         try:
             yd = yaml.load(ymlfile)
         except yaml.YAMLError as er:
-            print(er)
+            sys.stderr.write(er)
+            raise SystemExit(4)
     return yd
 
 def checkPath():
     """Checks if the path has provided and assigned to variable."""
     global proj_path
     if args.path:
-        proj_path = args.path
+        if args.SUBCMD=='describe':
+            sys.stderr.write("INVALID INPUT: path is not required to perfom {} operation\n".format(args.SUBCMD))
+            raise SystemExit(4)
+        else:
+            proj_path = args.path
     else:
         if 'PROJMAN_LOCATION' in os.environ.keys():
             proj_path = os.environ.get('PROJMAN_LOCATION')
@@ -50,33 +86,36 @@ def checkType(yaml_data):
             flag=1
             break
     if flag==0:
-        print("INVALID TYPE: Please enter the valid type as per the yaml.")
-        exit()
+        sys.stderr.write("INVALID TYPE: Please enter the valid type as per the yaml.")
+        raise SystemExit(4)
 
 def validations(yd):
     """Validates the input arguments for all the conditions"""
     checkPath()
     if args.SUBCMD not in ["list","create","delete","types","describe"]:
-        print("INVALID SUBCMD: SUBCMD should be any one of create, delete, types, describe")
-        exit()
-    if args.SUBCMD=='list':
+        sys.stderr.write("INVALID SUBCMD: SUBCMD should be any one of create, delete, types, describe")
+        raise SystemExit(4)
+    if args.SUBCMD=='list' or args.SUBCMD=='describe':
         if args.NAME:
-            print("INVALID INPUT: For listing project name should not be passed")
-            exit()
+            sys.stderr.write("INVALID INPUT: For listing and describe project name should not be passed")
+            raise SystemExit(4)
     else:
         if not args.NAME:
-            print("INVALID INPUT: Project name is required to perfom",args.SUBCMD,"operation.")
-            exit()
+            sys.stderr.write("INVALID INPUT: Project name is required to perfom {} operation\n".format(args.SUBCMD))
+            raise SystemExit(4)
+    if args.SUBCMD=='describe' and args.type:
+        sys.stderr.write("INVALID INPUT: types is not required to perfom {} operation\n".format(args.SUBCMD))
+        raise SystemExit(4)
     if args.SUBCMD == 'types' and args.type:
-        print("INVALID INPUT: For sub command 'types' there should not be -t argument present")
-        exit()
-    if args.SUBCMD in ['delete','types','describe']:
+        sys.stderr.write("INVALID INPUT: For sub command 'types' there should not be -t argument present")
+        raise SystemExit(4)
+    if args.SUBCMD in ['delete','types']:
         if args.NAME not in os.listdir(proj_path):
-            print("INVALID PROJECT: The given project is not present to perform sub command.")
-            exit()
+            sys.stderr.write("INVALID PROJECT: The given project is not present to perform sub command.")
+            raise SystemExit(4)
     if args.SUBCMD =='create' and args.NAME in os.listdir(proj_path):
-        print("The given project is already exists, please provide diff project name.")
-        exit()
+        sys.stderr.write("The given project is already exists, please provide diff project name.")
+        raise SystemExit(4)
     if args.type:
         checkType(yd)
 
@@ -90,7 +129,7 @@ if __name__ == '__main__':
 
     #Calling function for list sub command
     if args.SUBCMD == 'list':
-        otherOperations.listProjects(proj_path,args.type)
+        otherOperations.listProjects(yaml_data,proj_path,args.type)
 
     #Calling function for create sub command
     if args.SUBCMD == 'create':
@@ -103,9 +142,9 @@ if __name__ == '__main__':
                     per = item['permission']
                     yaml_data = item['value']
                     break
-            createStructure.structure(yaml_data,perm,proj_path)
+            structure.structure(yaml_data,perm,args.SUBCMD,proj_path)
         else:
-            createStructure.structure(yaml_data,perm,proj_path)
+            structure.structure(yaml_data,perm,args.SUBCMD,proj_path)
 
     #Calling function for delete sub command
     if args.SUBCMD == 'delete':
@@ -120,4 +159,5 @@ if __name__ == '__main__':
 
     #Calling function for describe sub command
     if args.SUBCMD == 'describe':
-        otherOperations.describe(proj_path)
+        # otherOperations.describe(proj_path)
+        structure.structure(yaml_data,perm,args.SUBCMD)
